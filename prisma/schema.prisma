@@ -1,0 +1,103 @@
+// FAMILYBRIDGE - Prisma Schema
+// Database: Neon Serverless PostgreSQL
+// Auth: NextAuth v5 (Prisma Adapter)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// --- NextAuth Required Models -----------------------------------------------
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// --- FAMILYBRIDGE Core Models ------------------------------------------------
+
+model User {
+  id        String    @id @default(cuid())
+  name      String?
+  email     String?   @unique
+  emailVerified DateTime?
+  image     String?
+  role      String?   // "primary" | "guardian" | "child"
+  familyId  String?   // future: link family members together
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  accounts  Account[]
+  sessions  Session[]
+}
+
+model FamilyMember {
+  id                  String     @id @default(cuid())
+  familyId            String     @default("family_default")
+  name                String
+  relationship        String     // father, mother, son, daughter, other
+  age                 Int
+  email               String?
+  phone               String?
+  avatarUrl           String?
+  isTrustedContact    Boolean    @default(false)
+  canAccessContinuity Boolean    @default(false)
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+}
+
+model Document {
+  id              String        @id @default(cuid())
+  familyId        String        @default("family_default")
+  title           String
+  fileName        String?
+  fileSize        String?
+  fileType        String?
+  fileData        String?       @db.Text
+  category        String        // insurance, property, financial, education, identity, vehicle, other
+  documentType    String        // life_insurance, health_insurance, property_deed, etc.
+  uploadedById    String?
+  uploadedAt      DateTime      @default(now())
+  status          String        @default("uploaded")
+  extractedData   Json          @default("{}")
+  visibility      Json          @default("{}")
+  recipientTarget String?       // wife, children, family, self
+  purpose         String?       // letter, education, financial, property, insurance, identity, will, keys
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
